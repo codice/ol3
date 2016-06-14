@@ -1,7 +1,6 @@
 goog.provide('ol.source.Stamen');
 
 goog.require('goog.asserts');
-goog.require('ol');
 goog.require('ol.Attribution');
 goog.require('ol.source.OSM');
 goog.require('ol.source.XYZ');
@@ -71,11 +70,10 @@ ol.source.StamenProviderConfig = {
     maxZoom: 20
   },
   'watercolor': {
-    minZoom: 3,
+    minZoom: 1,
     maxZoom: 16
   }
 };
-
 
 
 /**
@@ -91,31 +89,32 @@ ol.source.Stamen = function(options) {
 
   var i = options.layer.indexOf('-');
   var provider = i == -1 ? options.layer : options.layer.slice(0, i);
-  goog.asserts.assert(provider in ol.source.StamenProviderConfig);
+  goog.asserts.assert(provider in ol.source.StamenProviderConfig,
+      'known provider configured');
   var providerConfig = ol.source.StamenProviderConfig[provider];
 
-  goog.asserts.assert(options.layer in ol.source.StamenLayerConfig);
+  goog.asserts.assert(options.layer in ol.source.StamenLayerConfig,
+      'known layer configured');
   var layerConfig = ol.source.StamenLayerConfig[options.layer];
 
-  var root = ol.IS_HTTPS ? 'https://stamen-tiles-{a-d}.a.ssl.fastly.net/' :
-      'http://{a-d}.tile.stamen.com/';
-  var url = goog.isDef(options.url) ? options.url :
-      root + options.layer + '/{z}/{x}/{y}.' +
-      layerConfig.extension;
+  var url = options.url !== undefined ? options.url :
+      'https://stamen-tiles-{a-d}.a.ssl.fastly.net/' + options.layer +
+      '/{z}/{x}/{y}.' + layerConfig.extension;
 
-  goog.base(this, {
+  ol.source.XYZ.call(this, {
     attributions: ol.source.Stamen.ATTRIBUTIONS,
+    cacheSize: options.cacheSize,
     crossOrigin: 'anonymous',
     maxZoom: providerConfig.maxZoom,
-    // FIXME uncomment the following when tilegrid supports minZoom
-    //minZoom: providerConfig.minZoom,
+    minZoom: providerConfig.minZoom,
     opaque: layerConfig.opaque,
+    reprojectionErrorThreshold: options.reprojectionErrorThreshold,
     tileLoadFunction: options.tileLoadFunction,
     url: url
   });
 
 };
-goog.inherits(ol.source.Stamen, ol.source.XYZ);
+ol.inherits(ol.source.Stamen, ol.source.XYZ);
 
 
 /**

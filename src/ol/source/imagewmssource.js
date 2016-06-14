@@ -3,18 +3,18 @@
 goog.provide('ol.source.ImageWMS');
 
 goog.require('goog.asserts');
-goog.require('goog.object');
-goog.require('goog.string');
-goog.require('goog.uri.utils');
 goog.require('ol');
 goog.require('ol.Image');
-goog.require('ol.ImageLoadFunctionType');
+goog.require('ol.events');
+goog.require('ol.events.EventType');
 goog.require('ol.extent');
+goog.require('ol.object');
 goog.require('ol.proj');
 goog.require('ol.source.Image');
 goog.require('ol.source.wms');
 goog.require('ol.source.wms.ServerType');
-
+goog.require('ol.string');
+goog.require('ol.uri');
 
 
 /**
@@ -22,15 +22,16 @@ goog.require('ol.source.wms.ServerType');
  * Source for WMS servers providing single, untiled images.
  *
  * @constructor
+ * @fires ol.source.ImageEvent
  * @extends {ol.source.Image}
  * @param {olx.source.ImageWMSOptions=} opt_options Options.
  * @api stable
  */
 ol.source.ImageWMS = function(opt_options) {
 
-  var options = goog.isDef(opt_options) ? opt_options : {};
+  var options = opt_options || {};
 
-  goog.base(this, {
+  ol.source.Image.call(this, {
     attributions: options.attributions,
     logo: options.logo,
     projection: options.projection,
@@ -42,7 +43,7 @@ ol.source.ImageWMS = function(opt_options) {
    * @type {?string}
    */
   this.crossOrigin_ =
-      goog.isDef(options.crossOrigin) ? options.crossOrigin : null;
+      options.crossOrigin !== undefined ? options.crossOrigin : null;
 
   /**
    * @private
@@ -54,14 +55,14 @@ ol.source.ImageWMS = function(opt_options) {
    * @private
    * @type {ol.ImageLoadFunctionType}
    */
-  this.imageLoadFunction_ = goog.isDef(options.imageLoadFunction) ?
+  this.imageLoadFunction_ = options.imageLoadFunction !== undefined ?
       options.imageLoadFunction : ol.source.Image.defaultImageLoadFunction;
 
   /**
    * @private
-   * @type {Object}
+   * @type {!Object}
    */
-  this.params_ = options.params;
+  this.params_ = options.params || {};
 
   /**
    * @private
@@ -81,7 +82,7 @@ ol.source.ImageWMS = function(opt_options) {
    * @private
    * @type {boolean}
    */
-  this.hidpi_ = goog.isDef(options.hidpi) ? options.hidpi : true;
+  this.hidpi_ = options.hidpi !== undefined ? options.hidpi : true;
 
   /**
    * @private
@@ -105,10 +106,10 @@ ol.source.ImageWMS = function(opt_options) {
    * @private
    * @type {number}
    */
-  this.ratio_ = goog.isDef(options.ratio) ? options.ratio : 1.5;
+  this.ratio_ = options.ratio !== undefined ? options.ratio : 1.5;
 
 };
-goog.inherits(ol.source.ImageWMS, ol.source.Image);
+ol.inherits(ol.source.ImageWMS, ol.source.Image);
 
 
 /**
@@ -133,12 +134,12 @@ ol.source.ImageWMS.GETFEATUREINFO_IMAGE_SIZE_ = [101, 101];
  * @return {string|undefined} GetFeatureInfo URL.
  * @api stable
  */
-ol.source.ImageWMS.prototype.getGetFeatureInfoUrl =
-    function(coordinate, resolution, projection, params) {
+ol.source.ImageWMS.prototype.getGetFeatureInfoUrl = function(coordinate, resolution, projection, params) {
 
-  goog.asserts.assert(!('VERSION' in params));
+  goog.asserts.assert(!('VERSION' in params),
+      'key VERSION is not allowed in params');
 
-  if (!goog.isDef(this.url_)) {
+  if (this.url_ === undefined) {
     return undefined;
   }
 
@@ -154,7 +155,7 @@ ol.source.ImageWMS.prototype.getGetFeatureInfoUrl =
     'TRANSPARENT': true,
     'QUERY_LAYERS': this.params_['LAYERS']
   };
-  goog.object.extend(baseParams, this.params_, params);
+  ol.object.assign(baseParams, this.params_, params);
 
   var x = Math.floor((coordinate[0] - extent[0]) / resolution);
   var y = Math.floor((extent[3] - coordinate[1]) / resolution);
@@ -181,21 +182,28 @@ ol.source.ImageWMS.prototype.getParams = function() {
 /**
  * @inheritDoc
  */
-ol.source.ImageWMS.prototype.getImage =
-    function(extent, resolution, pixelRatio, projection) {
+ol.source.ImageWMS.prototype.getImageInternal = function(extent, resolution, pixelRatio, projection) {
 
-  if (!goog.isDef(this.url_)) {
+  if (this.url_ === undefined) {
     return null;
   }
 
   resolution = this.findNearestResolution(resolution);
 
-  if (pixelRatio != 1 && (!this.hidpi_ || !goog.isDef(this.serverType_))) {
+  if (pixelRatio != 1 && (!this.hidpi_ || this.serverType_ === undefined)) {
     pixelRatio = 1;
   }
 
+  extent = extent.slice();
+  var centerX = (extent[0] + extent[2]) / 2;
+  var centerY = (extent[1] + extent[3]) / 2;
+
+  var imageResolution = resolution / pixelRatio;
+  var imageWidth = ol.extent.getWidth(extent) / imageResolution;
+  var imageHeight = ol.extent.getHeight(extent) / imageResolution;
+
   var image = this.image_;
-  if (!goog.isNull(image) &&
+  if (image &&
       this.renderedRevision_ == this.getRevision() &&
       image.getResolution() == resolution &&
       image.getPixelRatio() == pixelRatio &&
@@ -203,18 +211,6 @@ ol.source.ImageWMS.prototype.getImage =
     return image;
   }
 
-  var params = {
-    'SERVICE': 'WMS',
-    'VERSION': ol.DEFAULT_WMS_VERSION,
-    'REQUEST': 'GetMap',
-    'FORMAT': 'image/png',
-    'TRANSPARENT': true
-  };
-  goog.object.extend(params, this.params_);
-
-  extent = extent.slice();
-  var centerX = (extent[0] + extent[2]) / 2;
-  var centerY = (extent[1] + extent[3]) / 2;
   if (this.ratio_ != 1) {
     var halfWidth = this.ratio_ * ol.extent.getWidth(extent) / 2;
     var halfHeight = this.ratio_ * ol.extent.getHeight(extent) / 2;
@@ -224,20 +220,17 @@ ol.source.ImageWMS.prototype.getImage =
     extent[3] = centerY + halfHeight;
   }
 
-  var imageResolution = resolution / pixelRatio;
+  var params = {
+    'SERVICE': 'WMS',
+    'VERSION': ol.DEFAULT_WMS_VERSION,
+    'REQUEST': 'GetMap',
+    'FORMAT': 'image/png',
+    'TRANSPARENT': true
+  };
+  ol.object.assign(params, this.params_);
 
-  // Compute an integer width and height.
-  var width = Math.ceil(ol.extent.getWidth(extent) / imageResolution);
-  var height = Math.ceil(ol.extent.getHeight(extent) / imageResolution);
-
-  // Modify the extent to match the integer width and height.
-  extent[0] = centerX - imageResolution * width / 2;
-  extent[2] = centerX + imageResolution * width / 2;
-  extent[1] = centerY - imageResolution * height / 2;
-  extent[3] = centerY + imageResolution * height / 2;
-
-  this.imageSize_[0] = width;
-  this.imageSize_[1] = height;
+  this.imageSize_[0] = Math.ceil(imageWidth * this.ratio_);
+  this.imageSize_[1] = Math.ceil(imageHeight * this.ratio_);
 
   var url = this.getRequestUrl_(extent, this.imageSize_, pixelRatio,
       projection, params);
@@ -247,12 +240,16 @@ ol.source.ImageWMS.prototype.getImage =
 
   this.renderedRevision_ = this.getRevision();
 
+  ol.events.listen(this.image_, ol.events.EventType.CHANGE,
+      this.handleImageChange, this);
+
   return this.image_;
 
 };
 
 
 /**
+ * Return the image load function of the source.
  * @return {ol.ImageLoadFunctionType} The image load function.
  * @api
  */
@@ -270,24 +267,25 @@ ol.source.ImageWMS.prototype.getImageLoadFunction = function() {
  * @return {string} Request URL.
  * @private
  */
-ol.source.ImageWMS.prototype.getRequestUrl_ =
-    function(extent, size, pixelRatio, projection, params) {
+ol.source.ImageWMS.prototype.getRequestUrl_ = function(extent, size, pixelRatio, projection, params) {
 
-  goog.asserts.assert(goog.isDef(this.url_));
+  goog.asserts.assert(this.url_ !== undefined, 'url is defined');
 
   params[this.v13_ ? 'CRS' : 'SRS'] = projection.getCode();
 
   if (!('STYLES' in this.params_)) {
-    /* jshint -W053 */
-    params['STYLES'] = new String('');
-    /* jshint +W053 */
+    params['STYLES'] = '';
   }
 
   if (pixelRatio != 1) {
     switch (this.serverType_) {
       case ol.source.wms.ServerType.GEOSERVER:
         var dpi = (90 * pixelRatio + 0.5) | 0;
-        params['FORMAT_OPTIONS'] = 'dpi:' + dpi;
+        if ('FORMAT_OPTIONS' in params) {
+          params['FORMAT_OPTIONS'] += ';dpi:' + dpi;
+        } else {
+          params['FORMAT_OPTIONS'] = 'dpi:' + dpi;
+        }
         break;
       case ol.source.wms.ServerType.MAPSERVER:
         params['MAP_RESOLUTION'] = 90 * pixelRatio;
@@ -297,7 +295,7 @@ ol.source.ImageWMS.prototype.getRequestUrl_ =
         params['DPI'] = 90 * pixelRatio;
         break;
       default:
-        goog.asserts.fail();
+        goog.asserts.fail('unknown serverType configured');
         break;
     }
   }
@@ -314,12 +312,12 @@ ol.source.ImageWMS.prototype.getRequestUrl_ =
   }
   params['BBOX'] = bbox.join(',');
 
-  return goog.uri.utils.appendParamsFromMap(this.url_, params);
+  return ol.uri.appendParams(this.url_, params);
 };
 
 
 /**
- * Return the URL used for this WMS source.
+ * Return the URL used for this WMS source.
  * @return {string|undefined} URL.
  * @api stable
  */
@@ -329,6 +327,7 @@ ol.source.ImageWMS.prototype.getUrl = function() {
 
 
 /**
+ * Set the image load function of the source.
  * @param {ol.ImageLoadFunctionType} imageLoadFunction Image load function.
  * @api
  */
@@ -341,6 +340,7 @@ ol.source.ImageWMS.prototype.setImageLoadFunction = function(
 
 
 /**
+ * Set the URL to use for requests.
  * @param {string|undefined} url URL.
  * @api stable
  */
@@ -359,7 +359,7 @@ ol.source.ImageWMS.prototype.setUrl = function(url) {
  * @api stable
  */
 ol.source.ImageWMS.prototype.updateParams = function(params) {
-  goog.object.extend(this.params_, params);
+  ol.object.assign(this.params_, params);
   this.updateV13_();
   this.image_ = null;
   this.changed();
@@ -370,7 +370,6 @@ ol.source.ImageWMS.prototype.updateParams = function(params) {
  * @private
  */
 ol.source.ImageWMS.prototype.updateV13_ = function() {
-  var version =
-      goog.object.get(this.params_, 'VERSION', ol.DEFAULT_WMS_VERSION);
-  this.v13_ = goog.string.compareVersions(version, '1.3') >= 0;
+  var version = this.params_['VERSION'] || ol.DEFAULT_WMS_VERSION;
+  this.v13_ = ol.string.compareVersions(version, '1.3') >= 0;
 };

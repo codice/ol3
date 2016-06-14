@@ -23,7 +23,6 @@ var iconStyle = new ol.style.Style({
     anchor: [0.5, 46],
     anchorXUnits: 'fraction',
     anchorYUnits: 'pixels',
-    opacity: 0.75,
     src: 'data/icon.png'
   }))
 });
@@ -40,13 +39,13 @@ var vectorLayer = new ol.layer.Vector({
 
 var rasterLayer = new ol.layer.Tile({
   source: new ol.source.TileJSON({
-    url: 'http://api.tiles.mapbox.com/v3/mapbox.geography-class.jsonp',
+    url: 'http://api.tiles.mapbox.com/v3/mapbox.geography-class.json',
     crossOrigin: ''
   })
 });
 
 var map = new ol.Map({
-  renderer: exampleNS.getRendererFromQueryString(),
+  renderer: common.getRendererFromQueryString(),
   layers: [rasterLayer, vectorLayer],
   target: document.getElementById('map'),
   view: new ol.View({
@@ -60,20 +59,20 @@ var element = document.getElementById('popup');
 var popup = new ol.Overlay({
   element: element,
   positioning: 'bottom-center',
-  stopEvent: false
+  stopEvent: false,
+  offset: [0, -50]
 });
 map.addOverlay(popup);
 
 // display popup on click
 map.on('click', function(evt) {
   var feature = map.forEachFeatureAtPixel(evt.pixel,
-      function(feature, layer) {
+      function(feature) {
         return feature;
       });
   if (feature) {
-    var geometry = feature.getGeometry();
-    var coord = geometry.getCoordinates();
-    popup.setPosition(coord);
+    var coordinates = feature.getGeometry().getCoordinates();
+    popup.setPosition(coordinates);
     $(element).popover({
       'placement': 'top',
       'html': true,

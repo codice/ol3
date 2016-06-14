@@ -1,10 +1,8 @@
 goog.provide('ol.source.ImageCanvas');
 
-goog.require('ol.CanvasFunctionType');
 goog.require('ol.ImageCanvas');
 goog.require('ol.extent');
 goog.require('ol.source.Image');
-
 
 
 /**
@@ -13,18 +11,17 @@ goog.require('ol.source.Image');
  *
  * @constructor
  * @extends {ol.source.Image}
- * @param {olx.source.ImageCanvasOptions} options
+ * @param {olx.source.ImageCanvasOptions} options Constructor options.
  * @api
  */
 ol.source.ImageCanvas = function(options) {
 
-  goog.base(this, {
+  ol.source.Image.call(this, {
     attributions: options.attributions,
     logo: options.logo,
     projection: options.projection,
     resolutions: options.resolutions,
-    state: goog.isDef(options.state) ?
-        /** @type {ol.source.State} */ (options.state) : undefined
+    state: options.state
   });
 
   /**
@@ -49,22 +46,21 @@ ol.source.ImageCanvas = function(options) {
    * @private
    * @type {number}
    */
-  this.ratio_ = goog.isDef(options.ratio) ?
+  this.ratio_ = options.ratio !== undefined ?
       options.ratio : 1.5;
 
 };
-goog.inherits(ol.source.ImageCanvas, ol.source.Image);
+ol.inherits(ol.source.ImageCanvas, ol.source.Image);
 
 
 /**
  * @inheritDoc
  */
-ol.source.ImageCanvas.prototype.getImage =
-    function(extent, resolution, pixelRatio, projection) {
+ol.source.ImageCanvas.prototype.getImageInternal = function(extent, resolution, pixelRatio, projection) {
   resolution = this.findNearestResolution(resolution);
 
   var canvas = this.canvas_;
-  if (!goog.isNull(canvas) &&
+  if (canvas &&
       this.renderedRevision_ == this.getRevision() &&
       canvas.getResolution() == resolution &&
       canvas.getPixelRatio() == pixelRatio &&
@@ -80,7 +76,7 @@ ol.source.ImageCanvas.prototype.getImage =
 
   var canvasElement = this.canvasFunction_(
       extent, resolution, pixelRatio, size, projection);
-  if (!goog.isNull(canvasElement)) {
+  if (canvasElement) {
     canvas = new ol.ImageCanvas(extent, resolution, pixelRatio,
         this.getAttributions(), canvasElement);
   }

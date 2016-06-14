@@ -1,10 +1,10 @@
 goog.provide('ol.renderer.Layer');
 
-goog.require('goog.Disposable');
 goog.require('goog.asserts');
-goog.require('goog.events');
-goog.require('goog.events.EventType');
-goog.require('goog.functions');
+goog.require('ol.events');
+goog.require('ol.events.EventType');
+goog.require('ol');
+goog.require('ol.functions');
 goog.require('ol.ImageState');
 goog.require('ol.Observable');
 goog.require('ol.TileRange');
@@ -13,21 +13,18 @@ goog.require('ol.layer.Layer');
 goog.require('ol.source.Source');
 goog.require('ol.source.State');
 goog.require('ol.source.Tile');
-goog.require('ol.tilecoord');
 goog.require('ol.vec.Mat4');
-
 
 
 /**
  * @constructor
  * @extends {ol.Observable}
  * @param {ol.layer.Layer} layer Layer.
- * @suppress {checkStructDictInheritance}
  * @struct
  */
 ol.renderer.Layer = function(layer) {
 
-  goog.base(this);
+  ol.Observable.call(this);
 
   /**
    * @private
@@ -37,19 +34,19 @@ ol.renderer.Layer = function(layer) {
 
 
 };
-goog.inherits(ol.renderer.Layer, ol.Observable);
+ol.inherits(ol.renderer.Layer, ol.Observable);
 
 
 /**
  * @param {ol.Coordinate} coordinate Coordinate.
  * @param {olx.FrameState} frameState Frame state.
- * @param {function(this: S, ol.Feature, ol.layer.Layer): T} callback Feature
- *     callback.
+ * @param {function(this: S, (ol.Feature|ol.render.Feature), ol.layer.Layer): T}
+ *     callback Feature callback.
  * @param {S} thisArg Value to use as `this` when executing `callback`.
  * @return {T|undefined} Callback result.
  * @template S,T
  */
-ol.renderer.Layer.prototype.forEachFeatureAtCoordinate = goog.nullFunction;
+ol.renderer.Layer.prototype.forEachFeatureAtCoordinate = ol.nullFunction;
 
 
 /**
@@ -60,14 +57,13 @@ ol.renderer.Layer.prototype.forEachFeatureAtCoordinate = goog.nullFunction;
  * @return {T|undefined} Callback result.
  * @template S,T
  */
-ol.renderer.Layer.prototype.forEachLayerAtPixel =
-    function(pixel, frameState, callback, thisArg) {
+ol.renderer.Layer.prototype.forEachLayerAtPixel = function(pixel, frameState, callback, thisArg) {
   var coordinate = pixel.slice();
   ol.vec.Mat4.multVec2(
       frameState.pixelToCoordinateMatrix, coordinate, coordinate);
 
   var hasFeature = this.forEachFeatureAtCoordinate(
-      coordinate, frameState, goog.functions.TRUE, this);
+      coordinate, frameState, ol.functions.TRUE, this);
 
   if (hasFeature) {
     return callback.call(thisArg, this.layer_);
@@ -82,12 +78,13 @@ ol.renderer.Layer.prototype.forEachLayerAtPixel =
  * @param {olx.FrameState} frameState Frame state.
  * @return {boolean} Is there a feature at the given coordinate?
  */
-ol.renderer.Layer.prototype.hasFeatureAtCoordinate = goog.functions.FALSE;
+ol.renderer.Layer.prototype.hasFeatureAtCoordinate = ol.functions.FALSE;
 
 
 /**
  * Create a function that adds loaded tiles to the tile lookup.
  * @param {ol.source.Tile} source Tile source.
+ * @param {ol.proj.Projection} projection Projection of the tiles.
  * @param {Object.<number, Object.<string, ol.Tile>>} tiles Lookup of loaded
  *     tiles by zoom level.
  * @return {function(number, ol.TileRange):boolean} A function that can be
@@ -95,25 +92,26 @@ ol.renderer.Layer.prototype.hasFeatureAtCoordinate = goog.functions.FALSE;
  *     lookup.
  * @protected
  */
-ol.renderer.Layer.prototype.createLoadedTileFinder = function(source, tiles) {
-  /**
-   * @param {number} zoom Zoom level.
-   * @param {ol.TileRange} tileRange Tile range.
-   * @return {boolean} The tile range is fully loaded.
-   */
-  return function(zoom, tileRange) {
-    return source.forEachLoadedTile(zoom, tileRange, function(tile) {
-      if (!tiles[zoom]) {
-        tiles[zoom] = {};
-      }
-      tiles[zoom][tile.tileCoord.toString()] = tile;
-    });
-  };
+ol.renderer.Layer.prototype.createLoadedTileFinder = function(source, projection, tiles) {
+  return (
+      /**
+       * @param {number} zoom Zoom level.
+       * @param {ol.TileRange} tileRange Tile range.
+       * @return {boolean} The tile range is fully loaded.
+       */
+      function(zoom, tileRange) {
+        function callback(tile) {
+          if (!tiles[zoom]) {
+            tiles[zoom] = {};
+          }
+          tiles[zoom][tile.tileCoord.toString()] = tile;
+        }
+        return source.forEachLoadedTile(projection, zoom, tileRange, callback);
+      });
 };
 
 
 /**
- * @protected
  * @return {ol.layer.Layer} Layer.
  */
 ol.renderer.Layer.prototype.getLayer = function() {
@@ -123,7 +121,7 @@ ol.renderer.Layer.prototype.getLayer = function() {
 
 /**
  * Handle changes in image state.
- * @param {goog.events.Event} event Image change event.
+ * @param {ol.events.Event} event Image change event.
  * @private
  */
 ol.renderer.Layer.prototype.handleImageChange_ = function(event) {
@@ -149,14 +147,17 @@ ol.renderer.Layer.prototype.loadImage = function(image) {
     // the image is either "idle" or "loading", register the change
     // listener (a noop if the listener was already registered)
     goog.asserts.assert(imageState == ol.ImageState.IDLE ||
-        imageState == ol.ImageState.LOADING);
-    goog.events.listenOnce(image, goog.events.EventType.CHANGE,
-        this.handleImageChange_, false, this);
+        imageState == ol.ImageState.LOADING,
+        'imageState is "idle" or "loading"');
+    ol.events.listen(image, ol.events.EventType.CHANGE,
+        this.handleImageChange_, this);
   }
   if (imageState == ol.ImageState.IDLE) {
     image.load();
     imageState = image.getState();
-    goog.asserts.assert(imageState == ol.ImageState.LOADING);
+    goog.asserts.assert(imageState == ol.ImageState.LOADING ||
+        imageState == ol.ImageState.LOADED,
+        'imageState is "loading" or "loaded"');
   }
   return imageState == ol.ImageState.LOADED;
 };
@@ -178,20 +179,22 @@ ol.renderer.Layer.prototype.renderIfReadyAndVisible = function() {
  * @param {ol.source.Tile} tileSource Tile source.
  * @protected
  */
-ol.renderer.Layer.prototype.scheduleExpireCache =
-    function(frameState, tileSource) {
+ol.renderer.Layer.prototype.scheduleExpireCache = function(frameState, tileSource) {
   if (tileSource.canExpireCache()) {
+    /**
+     * @param {ol.source.Tile} tileSource Tile source.
+     * @param {ol.Map} map Map.
+     * @param {olx.FrameState} frameState Frame state.
+     */
+    var postRenderFunction = function(tileSource, map, frameState) {
+      var tileSourceKey = goog.getUid(tileSource).toString();
+      tileSource.expireCache(frameState.viewState.projection,
+                             frameState.usedTiles[tileSourceKey]);
+    }.bind(null, tileSource);
+
     frameState.postRenderFunctions.push(
-        goog.partial(
-            /**
-             * @param {ol.source.Tile} tileSource Tile source.
-             * @param {ol.Map} map Map.
-             * @param {olx.FrameState} frameState Frame state.
-             */
-            function(tileSource, map, frameState) {
-              var tileSourceKey = goog.getUid(tileSource).toString();
-              tileSource.expireCache(frameState.usedTiles[tileSourceKey]);
-            }, tileSource));
+      /** @type {ol.PostRenderFunction} */ (postRenderFunction)
+    );
   }
 };
 
@@ -202,9 +205,8 @@ ol.renderer.Layer.prototype.scheduleExpireCache =
  * @param {Array.<ol.Attribution>} attributions Attributions (source).
  * @protected
  */
-ol.renderer.Layer.prototype.updateAttributions =
-    function(attributionsSet, attributions) {
-  if (goog.isDefAndNotNull(attributions)) {
+ol.renderer.Layer.prototype.updateAttributions = function(attributionsSet, attributions) {
+  if (attributions) {
     var attribution, i, ii;
     for (i = 0, ii = attributions.length; i < ii; ++i) {
       attribution = attributions[i];
@@ -221,12 +223,12 @@ ol.renderer.Layer.prototype.updateAttributions =
  */
 ol.renderer.Layer.prototype.updateLogos = function(frameState, source) {
   var logo = source.getLogo();
-  if (goog.isDef(logo)) {
-    if (goog.isString(logo)) {
+  if (logo !== undefined) {
+    if (typeof logo === 'string') {
       frameState.logos[logo] = '';
     } else if (goog.isObject(logo)) {
-      goog.asserts.assertString(logo.href);
-      goog.asserts.assertString(logo.src);
+      goog.asserts.assertString(logo.href, 'logo.href is a string');
+      goog.asserts.assertString(logo.src, 'logo.src is a string');
       frameState.logos[logo.src] = logo.href;
     }
   }
@@ -240,8 +242,7 @@ ol.renderer.Layer.prototype.updateLogos = function(frameState, source) {
  * @param {ol.TileRange} tileRange Tile range.
  * @protected
  */
-ol.renderer.Layer.prototype.updateUsedTiles =
-    function(usedTiles, tileSource, z, tileRange) {
+ol.renderer.Layer.prototype.updateUsedTiles = function(usedTiles, tileSource, z, tileRange) {
   // FIXME should we use tilesToDrawByZ instead?
   var tileSourceKey = goog.getUid(tileSource).toString();
   var zKey = z.toString();
@@ -259,40 +260,13 @@ ol.renderer.Layer.prototype.updateUsedTiles =
 
 
 /**
- * @param {function(ol.Tile): boolean} isLoadedFunction Function to
- *     determine if the tile is loaded.
- * @param {ol.source.Tile} tileSource Tile source.
- * @param {number} pixelRatio Pixel ratio.
- * @param {ol.proj.Projection} projection Projection.
- * @protected
- * @return {function(number, number, number): ol.Tile} Returns a tile if it is
- *     loaded.
- */
-ol.renderer.Layer.prototype.createGetTileIfLoadedFunction =
-    function(isLoadedFunction, tileSource, pixelRatio, projection) {
-  return (
-      /**
-       * @param {number} z Z.
-       * @param {number} x X.
-       * @param {number} y Y.
-       * @return {ol.Tile} Tile.
-       */
-      function(z, x, y) {
-        var tile = tileSource.getTile(z, x, y, pixelRatio, projection);
-        return isLoadedFunction(tile) ? tile : null;
-      });
-};
-
-
-/**
  * @param {ol.Coordinate} center Center.
  * @param {number} resolution Resolution.
  * @param {ol.Size} size Size.
  * @protected
  * @return {ol.Coordinate} Snapped center.
  */
-ol.renderer.Layer.prototype.snapCenterToPixel =
-    function(center, resolution, size) {
+ol.renderer.Layer.prototype.snapCenterToPixel = function(center, resolution, size) {
   return [
     resolution * (Math.round(center[0] / resolution) + (size[0] % 2) / 2),
     resolution * (Math.round(center[1] / resolution) + (size[1] % 2) / 2)
@@ -339,17 +313,17 @@ ol.renderer.Layer.prototype.manageTilePyramid = function(
         if (currentZ - z <= preload) {
           tile = tileSource.getTile(z, x, y, pixelRatio, projection);
           if (tile.getState() == ol.TileState.IDLE) {
-            wantedTiles[ol.tilecoord.toString(tile.tileCoord)] = true;
+            wantedTiles[tile.tileCoord.toString()] = true;
             if (!tileQueue.isKeyQueued(tile.getKey())) {
               tileQueue.enqueue([tile, tileSourceKey,
                 tileGrid.getTileCoordCenter(tile.tileCoord), tileResolution]);
             }
           }
-          if (goog.isDef(opt_tileCallback)) {
+          if (opt_tileCallback !== undefined) {
             opt_tileCallback.call(opt_this, tile);
           }
         } else {
-          tileSource.useTile(z, x, y);
+          tileSource.useTile(z, x, y, projection);
         }
       }
     }

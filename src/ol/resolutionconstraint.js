@@ -1,22 +1,14 @@
 goog.provide('ol.ResolutionConstraint');
-goog.provide('ol.ResolutionConstraintType');
 
-goog.require('goog.math');
 goog.require('ol.array');
-
-
-/**
- * @typedef {function((number|undefined), number, number): (number|undefined)}
- */
-ol.ResolutionConstraintType;
+goog.require('ol.math');
 
 
 /**
  * @param {Array.<number>} resolutions Resolutions.
  * @return {ol.ResolutionConstraintType} Zoom function.
  */
-ol.ResolutionConstraint.createSnapToResolutions =
-    function(resolutions) {
+ol.ResolutionConstraint.createSnapToResolutions = function(resolutions) {
   return (
       /**
        * @param {number|undefined} resolution Resolution.
@@ -25,10 +17,10 @@ ol.ResolutionConstraint.createSnapToResolutions =
        * @return {number|undefined} Resolution.
        */
       function(resolution, delta, direction) {
-        if (goog.isDef(resolution)) {
+        if (resolution !== undefined) {
           var z =
               ol.array.linearFindNearest(resolutions, resolution, direction);
-          z = goog.math.clamp(z + delta, 0, resolutions.length - 1);
+          z = ol.math.clamp(z + delta, 0, resolutions.length - 1);
           return resolutions[z];
         } else {
           return undefined;
@@ -43,8 +35,7 @@ ol.ResolutionConstraint.createSnapToResolutions =
  * @param {number=} opt_maxLevel Maximum level.
  * @return {ol.ResolutionConstraintType} Zoom function.
  */
-ol.ResolutionConstraint.createSnapToPower =
-    function(power, maxResolution, opt_maxLevel) {
+ol.ResolutionConstraint.createSnapToPower = function(power, maxResolution, opt_maxLevel) {
   return (
       /**
        * @param {number|undefined} resolution Resolution.
@@ -53,7 +44,7 @@ ol.ResolutionConstraint.createSnapToPower =
        * @return {number|undefined} Resolution.
        */
       function(resolution, delta, direction) {
-        if (goog.isDef(resolution)) {
+        if (resolution !== undefined) {
           var offset;
           if (direction > 0) {
             offset = 0;
@@ -65,7 +56,7 @@ ol.ResolutionConstraint.createSnapToPower =
           var oldLevel = Math.floor(
               Math.log(maxResolution / resolution) / Math.log(power) + offset);
           var newLevel = Math.max(oldLevel + delta, 0);
-          if (goog.isDef(opt_maxLevel)) {
+          if (opt_maxLevel !== undefined) {
             newLevel = Math.min(newLevel, opt_maxLevel);
           }
           return maxResolution / Math.pow(power, newLevel);

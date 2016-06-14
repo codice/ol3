@@ -2,13 +2,12 @@ goog.provide('ol.interaction.DragPan');
 
 goog.require('goog.asserts');
 goog.require('ol.Kinetic');
-goog.require('ol.Pixel');
-goog.require('ol.PreRenderFunction');
+
 goog.require('ol.ViewHint');
 goog.require('ol.coordinate');
+goog.require('ol.functions');
 goog.require('ol.events.condition');
 goog.require('ol.interaction.Pointer');
-
 
 
 /**
@@ -22,13 +21,13 @@ goog.require('ol.interaction.Pointer');
  */
 ol.interaction.DragPan = function(opt_options) {
 
-  goog.base(this, {
+  ol.interaction.Pointer.call(this, {
     handleDownEvent: ol.interaction.DragPan.handleDownEvent_,
     handleDragEvent: ol.interaction.DragPan.handleDragEvent_,
     handleUpEvent: ol.interaction.DragPan.handleUpEvent_
   });
 
-  var options = goog.isDef(opt_options) ? opt_options : {};
+  var options = opt_options ? opt_options : {};
 
   /**
    * @private
@@ -51,7 +50,7 @@ ol.interaction.DragPan = function(opt_options) {
    * @private
    * @type {ol.events.ConditionType}
    */
-  this.condition_ = goog.isDef(options.condition) ?
+  this.condition_ = options.condition ?
       options.condition : ol.events.condition.noModifierKeys;
 
   /**
@@ -61,7 +60,7 @@ ol.interaction.DragPan = function(opt_options) {
   this.noKinetic_ = false;
 
 };
-goog.inherits(ol.interaction.DragPan, ol.interaction.Pointer);
+ol.inherits(ol.interaction.DragPan, ol.interaction.Pointer);
 
 
 /**
@@ -70,13 +69,14 @@ goog.inherits(ol.interaction.DragPan, ol.interaction.Pointer);
  * @private
  */
 ol.interaction.DragPan.handleDragEvent_ = function(mapBrowserEvent) {
-  goog.asserts.assert(this.targetPointers.length >= 1);
+  goog.asserts.assert(this.targetPointers.length >= 1,
+      'the length of this.targetPointers should be more than 1');
   var centroid =
       ol.interaction.Pointer.centroid(this.targetPointers);
   if (this.kinetic_) {
     this.kinetic_.update(centroid[0], centroid[1]);
   }
-  if (!goog.isNull(this.lastCentroid)) {
+  if (this.lastCentroid) {
     var deltaX = this.lastCentroid[0] - centroid[0];
     var deltaY = centroid[1] - this.lastCentroid[1];
     var map = mapBrowserEvent.map;
@@ -108,7 +108,7 @@ ol.interaction.DragPan.handleUpEvent_ = function(mapBrowserEvent) {
       var distance = this.kinetic_.getDistance();
       var angle = this.kinetic_.getAngle();
       var center = view.getCenter();
-      goog.asserts.assert(goog.isDef(center));
+      goog.asserts.assert(center !== undefined, 'center should be defined');
       this.kineticPreRenderFn_ = this.kinetic_.pan(center);
       map.beforeRender(this.kineticPreRenderFn_);
       var centerpx = map.getPixelFromCoordinate(center);
@@ -144,7 +144,7 @@ ol.interaction.DragPan.handleDownEvent_ = function(mapBrowserEvent) {
       view.setHint(ol.ViewHint.INTERACTING, 1);
     }
     map.render();
-    if (!goog.isNull(this.kineticPreRenderFn_) &&
+    if (this.kineticPreRenderFn_ &&
         map.removePreRenderFunction(this.kineticPreRenderFn_)) {
       view.setCenter(mapBrowserEvent.frameState.viewState.center);
       this.kineticPreRenderFn_ = null;
@@ -165,4 +165,4 @@ ol.interaction.DragPan.handleDownEvent_ = function(mapBrowserEvent) {
 /**
  * @inheritDoc
  */
-ol.interaction.DragPan.prototype.shouldStopEvent = goog.functions.FALSE;
+ol.interaction.DragPan.prototype.shouldStopEvent = ol.functions.FALSE;

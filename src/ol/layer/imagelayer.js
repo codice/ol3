@@ -3,7 +3,6 @@ goog.provide('ol.layer.Image');
 goog.require('ol.layer.Layer');
 
 
-
 /**
  * @classdesc
  * Server-rendered images that are available for arbitrary extents and
@@ -19,13 +18,14 @@ goog.require('ol.layer.Layer');
  * @api stable
  */
 ol.layer.Image = function(opt_options) {
-  var options = goog.isDef(opt_options) ? opt_options : {};
-  goog.base(this,  /** @type {olx.layer.LayerOptions} */ (options));
+  var options = opt_options ? opt_options : {};
+  ol.layer.Layer.call(this,  /** @type {olx.layer.LayerOptions} */ (options));
 };
-goog.inherits(ol.layer.Image, ol.layer.Layer);
+ol.inherits(ol.layer.Image, ol.layer.Layer);
 
 
 /**
+ * Return the associated {@link ol.source.Image source} of the image layer.
  * @function
  * @return {ol.source.Image} Source.
  * @api stable

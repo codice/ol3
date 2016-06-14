@@ -3,18 +3,14 @@ goog.provide('ol.control.ScaleLineProperty');
 goog.provide('ol.control.ScaleLineUnits');
 
 goog.require('goog.asserts');
-goog.require('goog.dom');
-goog.require('goog.dom.TagName');
-goog.require('goog.events');
-goog.require('goog.math');
+goog.require('ol.events');
 goog.require('goog.style');
+goog.require('ol');
 goog.require('ol.Object');
-goog.require('ol.TransformFunction');
 goog.require('ol.control.Control');
 goog.require('ol.css');
-goog.require('ol.proj');
+goog.require('ol.proj.METERS_PER_UNIT');
 goog.require('ol.proj.Units');
-goog.require('ol.sphere.NORMAL');
 
 
 /**
@@ -29,7 +25,6 @@ ol.control.ScaleLineProperty = {
  * Units for the scale line. Supported values are `'degrees'`, `'imperial'`,
  * `'nautical'`, `'metric'`, `'us'`.
  * @enum {string}
- * @api stable
  */
 ol.control.ScaleLineUnits = {
   DEGREES: 'degrees',
@@ -38,7 +33,6 @@ ol.control.ScaleLineUnits = {
   METRIC: 'metric',
   US: 'us'
 };
-
 
 
 /**
@@ -57,24 +51,24 @@ ol.control.ScaleLineUnits = {
  */
 ol.control.ScaleLine = function(opt_options) {
 
-  var options = goog.isDef(opt_options) ? opt_options : {};
+  var options = opt_options ? opt_options : {};
 
-  var className = goog.isDef(options.className) ?
-      options.className : 'ol-scale-line';
-
-  /**
-   * @private
-   * @type {Element}
-   */
-  this.innerElement_ = goog.dom.createDom(goog.dom.TagName.DIV,
-      className + '-inner');
+  var className = options.className !== undefined ? options.className : 'ol-scale-line';
 
   /**
    * @private
    * @type {Element}
    */
-  this.element_ = goog.dom.createDom(goog.dom.TagName.DIV,
-      className + ' ' + ol.css.CLASS_UNSELECTABLE, this.innerElement_);
+  this.innerElement_ = document.createElement('DIV');
+  this.innerElement_.className = className + '-inner';
+
+  /**
+   * @private
+   * @type {Element}
+   */
+  this.element_ = document.createElement('DIV');
+  this.element_.className = className + ' ' + ol.css.CLASS_UNSELECTABLE;
+  this.element_.appendChild(this.innerElement_);
 
   /**
    * @private
@@ -86,7 +80,7 @@ ol.control.ScaleLine = function(opt_options) {
    * @private
    * @type {number}
    */
-  this.minWidth_ = goog.isDef(options.minWidth) ? options.minWidth : 64;
+  this.minWidth_ = options.minWidth !== undefined ? options.minWidth : 64;
 
   /**
    * @private
@@ -106,30 +100,23 @@ ol.control.ScaleLine = function(opt_options) {
    */
   this.renderedHTML_ = '';
 
-  /**
-   * @private
-   * @type {?ol.TransformFunction}
-   */
-  this.toEPSG4326_ = null;
+  var render = options.render ? options.render : ol.control.ScaleLine.render;
 
-  var render = goog.isDef(options.render) ?
-      options.render : ol.control.ScaleLine.render;
-
-  goog.base(this, {
+  ol.control.Control.call(this, {
     element: this.element_,
     render: render,
     target: options.target
   });
 
-  goog.events.listen(
+  ol.events.listen(
       this, ol.Object.getChangeEventType(ol.control.ScaleLineProperty.UNITS),
-      this.handleUnitsChanged_, false, this);
+      this.handleUnitsChanged_, this);
 
   this.setUnits(/** @type {ol.control.ScaleLineUnits} */ (options.units) ||
       ol.control.ScaleLineUnits.METRIC);
 
 };
-goog.inherits(ol.control.ScaleLine, ol.control.Control);
+ol.inherits(ol.control.ScaleLine, ol.control.Control);
 
 
 /**
@@ -140,6 +127,7 @@ ol.control.ScaleLine.LEADING_DIGITS = [1, 2, 5];
 
 
 /**
+ * Return the units to use in the scale line.
  * @return {ol.control.ScaleLineUnits|undefined} The units to use in the scale
  *     line.
  * @observable
@@ -149,20 +137,17 @@ ol.control.ScaleLine.prototype.getUnits = function() {
   return /** @type {ol.control.ScaleLineUnits|undefined} */ (
       this.get(ol.control.ScaleLineProperty.UNITS));
 };
-goog.exportProperty(
-    ol.control.ScaleLine.prototype,
-    'getUnits',
-    ol.control.ScaleLine.prototype.getUnits);
 
 
 /**
+ * Update the scale line element.
  * @param {ol.MapEvent} mapEvent Map event.
  * @this {ol.control.ScaleLine}
  * @api
  */
 ol.control.ScaleLine.render = function(mapEvent) {
   var frameState = mapEvent.frameState;
-  if (goog.isNull(frameState)) {
+  if (!frameState) {
     this.viewState_ = null;
   } else {
     this.viewState_ = frameState.viewState;
@@ -180,6 +165,7 @@ ol.control.ScaleLine.prototype.handleUnitsChanged_ = function() {
 
 
 /**
+ * Set the units to use in the scale line.
  * @param {ol.control.ScaleLineUnits} units The units to use in the scale line.
  * @observable
  * @api stable
@@ -187,10 +173,6 @@ ol.control.ScaleLine.prototype.handleUnitsChanged_ = function() {
 ol.control.ScaleLine.prototype.setUnits = function(units) {
   this.set(ol.control.ScaleLineProperty.UNITS, units);
 };
-goog.exportProperty(
-    ol.control.ScaleLine.prototype,
-    'setUnits',
-    ol.control.ScaleLine.prototype.setUnits);
 
 
 /**
@@ -199,7 +181,7 @@ goog.exportProperty(
 ol.control.ScaleLine.prototype.updateElement_ = function() {
   var viewState = this.viewState_;
 
-  if (goog.isNull(viewState)) {
+  if (!viewState) {
     if (this.renderedVisible_) {
       goog.style.setElementShown(this.element_, false);
       this.renderedVisible_ = false;
@@ -209,61 +191,21 @@ ol.control.ScaleLine.prototype.updateElement_ = function() {
 
   var center = viewState.center;
   var projection = viewState.projection;
+  var metersPerUnit = projection.getMetersPerUnit();
   var pointResolution =
-      projection.getPointResolution(viewState.resolution, center);
-  var projectionUnits = projection.getUnits();
-
-  var cosLatitude;
-  var units = this.getUnits();
-  if (projectionUnits == ol.proj.Units.DEGREES &&
-      (units == ol.control.ScaleLineUnits.METRIC ||
-       units == ol.control.ScaleLineUnits.IMPERIAL ||
-       units == ol.control.ScaleLineUnits.US ||
-       units == ol.control.ScaleLineUnits.NAUTICAL)) {
-
-    // Convert pointResolution from degrees to meters
-    this.toEPSG4326_ = null;
-    cosLatitude = Math.cos(goog.math.toRadians(center[1]));
-    pointResolution *= Math.PI * cosLatitude * ol.sphere.NORMAL.radius / 180;
-    projectionUnits = ol.proj.Units.METERS;
-
-  } else if ((projectionUnits == ol.proj.Units.FEET ||
-      projectionUnits == ol.proj.Units.METERS) &&
-      units == ol.control.ScaleLineUnits.DEGREES) {
-
-    // Convert pointResolution from meters or feet to degrees
-    if (goog.isNull(this.toEPSG4326_)) {
-      this.toEPSG4326_ = ol.proj.getTransformFromProjections(
-          projection, ol.proj.get('EPSG:4326'));
-    }
-    cosLatitude = Math.cos(goog.math.toRadians(this.toEPSG4326_(center)[1]));
-    var radius = ol.sphere.NORMAL.radius;
-    if (projectionUnits == ol.proj.Units.FEET) {
-      radius /= 0.3048;
-    }
-    pointResolution *= 180 / (Math.PI * cosLatitude * radius);
-    projectionUnits = ol.proj.Units.DEGREES;
-
-  } else {
-    this.toEPSG4326_ = null;
-  }
-
-  goog.asserts.assert(
-      ((units == ol.control.ScaleLineUnits.METRIC ||
-        units == ol.control.ScaleLineUnits.IMPERIAL ||
-        units == ol.control.ScaleLineUnits.US ||
-        units == ol.control.ScaleLineUnits.NAUTICAL) &&
-       projectionUnits == ol.proj.Units.METERS) ||
-      (units == ol.control.ScaleLineUnits.DEGREES &&
-       projectionUnits == ol.proj.Units.DEGREES));
+      projection.getPointResolution(viewState.resolution, center) *
+      metersPerUnit;
 
   var nominalCount = this.minWidth_ * pointResolution;
   var suffix = '';
+  var units = this.getUnits();
   if (units == ol.control.ScaleLineUnits.DEGREES) {
-    if (nominalCount < 1 / 60) {
+    var metersPerDegree = ol.proj.METERS_PER_UNIT[ol.proj.Units.DEGREES];
+    pointResolution /= metersPerDegree;
+    if (nominalCount < metersPerDegree / 60) {
       suffix = '\u2033'; // seconds
       pointResolution *= 3600;
-    } else if (nominalCount < 1) {
+    } else if (nominalCount < metersPerDegree) {
       suffix = '\u2032'; // minutes
       pointResolution *= 60;
     } else {
@@ -305,14 +247,14 @@ ol.control.ScaleLine.prototype.updateElement_ = function() {
       pointResolution /= 1609.3472;
     }
   } else {
-    goog.asserts.fail();
+    goog.asserts.fail('Scale line element cannot be updated');
   }
 
   var i = 3 * Math.floor(
       Math.log(this.minWidth_ * pointResolution) / Math.log(10));
   var count, width;
   while (true) {
-    count = ol.control.ScaleLine.LEADING_DIGITS[i % 3] *
+    count = ol.control.ScaleLine.LEADING_DIGITS[((i % 3) + 3) % 3] *
         Math.pow(10, Math.floor(i / 3));
     width = Math.round(count / pointResolution);
     if (isNaN(width)) {

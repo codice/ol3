@@ -1,5 +1,3 @@
-goog.require('goog.userAgent');
-
 goog.provide('ol');
 
 
@@ -17,12 +15,6 @@ ol.ASSUME_TOUCH = false;
 
 
 /**
- * @define {boolean} Replace unused entries with NaNs.
- */
-ol.BUFFER_REPLACE_UNUSED_ENTRIES_WITH_NANS = goog.DEBUG;
-
-
-/**
  * TODO: rename this to something having to do with tile grids
  * see https://github.com/openlayers/ol3/issues/2076
  * @define {number} Default maximum zoom for default tile grids.
@@ -37,9 +29,10 @@ ol.DEFAULT_MIN_ZOOM = 0;
 
 
 /**
- * @define {number} Default high water mark.
+ * @define {number} Default maximum allowed threshold  (in pixels) for
+ *     reprojection triangulation. Default is `0.5`.
  */
-ol.DEFAULT_TILE_CACHE_HIGH_WATER_MARK = 2048;
+ol.DEFAULT_RASTER_REPROJECTION_ERROR_THRESHOLD = 0.5;
 
 
 /**
@@ -52,24 +45,6 @@ ol.DEFAULT_TILE_SIZE = 256;
  * @define {string} Default WMS version.
  */
 ol.DEFAULT_WMS_VERSION = '1.3.0';
-
-
-/**
- * @define {number} Drag-rotate-zoom animation duration.
- */
-ol.DRAGROTATEANDZOOM_ANIMATION_DURATION = 400;
-
-
-/**
- * @define {number} Drag-rotate animation duration.
- */
-ol.DRAGROTATE_ANIMATION_DURATION = 250;
-
-
-/**
- * @define {number} Drag-zoom animation duration.
- */
-ol.DRAGZOOM_ANIMATION_DURATION = 200;
 
 
 /**
@@ -121,6 +96,13 @@ ol.ENABLE_PROJ4JS = true;
 
 
 /**
+ * @define {boolean} Enable automatic reprojection of raster sources. Default is
+ *     `true`.
+ */
+ol.ENABLE_RASTER_REPROJECTION = true;
+
+
+/**
  * @define {boolean} Enable rendering of ol.layer.Tile based layers.  Default is
  *     `true`. Setting this to false at compile time in advanced mode removes
  *     all code supporting Tile layers from the build.
@@ -137,19 +119,19 @@ ol.ENABLE_VECTOR = true;
 
 
 /**
+ * @define {boolean} Enable rendering of ol.layer.VectorTile based layers.
+ *     Default is `true`. Setting this to false at compile time in advanced mode
+ *     removes all code supporting VectorTile layers from the build.
+ */
+ol.ENABLE_VECTOR_TILE = true;
+
+
+/**
  * @define {boolean} Enable the WebGL renderer.  Default is `true`. Setting
  *     this to false at compile time in advanced mode removes all code
  *     supporting the WebGL renderer from the build.
  */
 ol.ENABLE_WEBGL = true;
-
-
-/**
- * @define {boolean} Support legacy IE (7-8).  Default is `false`.
- *     If set to `true`, `goog.array.ASSUME_NATIVE_FUNCTIONS` must be set
- *     to `false` because legacy IE do not support ECMAScript 5 array functions.
- */
-ol.LEGACY_IE_SUPPORT = false;
 
 
 /**
@@ -160,31 +142,8 @@ ol.INITIAL_ATLAS_SIZE = 256;
 
 
 /**
- * The page is loaded using HTTPS.
- * @const
- * @type {boolean}
- */
-ol.IS_HTTPS = goog.global.location.protocol === 'https:';
-
-
-/**
- * Whether the current browser is legacy IE
- * @const
- * @type {boolean}
- */
-ol.IS_LEGACY_IE = goog.userAgent.IE &&
-    !goog.userAgent.isVersionOrHigher('9.0') && goog.userAgent.VERSION !== '';
-
-
-/**
- * @define {number} Keyboard pan duration.
- */
-ol.KEYBOARD_PAN_DURATION = 100;
-
-
-/**
  * @define {number} The maximum size in pixels of atlas images. Default is
- * `-1`, meaning it is not used (and `ol.ol.WEBGL_MAX_TEXTURE_SIZE` is
+ * `-1`, meaning it is not used (and `ol.WEBGL_MAX_TEXTURE_SIZE` is
  * used instead).
  */
 ol.MAX_ATLAS_SIZE = -1;
@@ -217,9 +176,38 @@ ol.OVERVIEWMAP_MIN_RATIO = 0.1;
 
 
 /**
- * @define {number} Rotate animation duration.
+ * @define {number} Maximum number of source tiles for raster reprojection of
+ *     a single tile.
+ *     If too many source tiles are determined to be loaded to create a single
+ *     reprojected tile the browser can become unresponsive or even crash.
+ *     This can happen if the developer defines projections improperly and/or
+ *     with unlimited extents.
+ *     If too many tiles are required, no tiles are loaded and
+ *     `ol.TileState.ERROR` state is set. Default is `100`.
  */
-ol.ROTATE_ANIMATION_DURATION = 250;
+ol.RASTER_REPROJECTION_MAX_SOURCE_TILES = 100;
+
+
+/**
+ * @define {number} Maximum number of subdivision steps during raster
+ *     reprojection triangulation. Prevents high memory usage and large
+ *     number of proj4 calls (for certain transformations and areas).
+ *     At most `2*(2^this)` triangles are created for each triangulated
+ *     extent (tile/image). Default is `10`.
+ */
+ol.RASTER_REPROJECTION_MAX_SUBDIVISION = 10;
+
+
+/**
+ * @define {number} Maximum allowed size of triangle relative to world width.
+ *     When transforming corners of world extent between certain projections,
+ *     the resulting triangulation seems to have zero error and no subdivision
+ *     is performed.
+ *     If the triangle width is more than this (relative to world width; 0-1),
+ *     subdivison is forced (up to `ol.RASTER_REPROJECTION_MAX_SUBDIVISION`).
+ *     Default is `0.25`.
+ */
+ol.RASTER_REPROJECTION_MAX_TRIANGLE_WIDTH = 0.25;
 
 
 /**
@@ -239,7 +227,6 @@ ol.WEBGL_TEXTURE_CACHE_HIGH_WATER_MARK = 1024;
  * supported, the value is set to `undefined`.
  * @const
  * @type {number|undefined}
- * @api
  */
 ol.WEBGL_MAX_TEXTURE_SIZE; // value is set in `ol.has`
 
@@ -250,12 +237,6 @@ ol.WEBGL_MAX_TEXTURE_SIZE; // value is set in `ol.has`
  * @type {Array.<string>}
  */
 ol.WEBGL_EXTENSIONS; // value is set in `ol.has`
-
-
-/**
- * @define {number} Zoom slider animation duration.
- */
-ol.ZOOMSLIDER_ANIMATION_DURATION = 200;
 
 
 /**
@@ -275,19 +256,23 @@ ol.ZOOMSLIDER_ANIMATION_DURATION = 200;
  *     var child = new ChildClass('a', 'b', 'see');
  *     child.foo(); // This works.
  *
- * In addition, a superclass' implementation of a method can be invoked as
- * follows:
- *
- *     ChildClass.prototype.foo = function(a) {
- *       ChildClass.base(this, 'foo', a);
- *       // Other code here.
- *     };
- *
- * @param {Function} childCtor Child constructor.
- * @param {Function} parentCtor Parent constructor.
+ * @param {!Function} childCtor Child constructor.
+ * @param {!Function} parentCtor Parent constructor.
  * @function
  * @api
  */
-ol.inherits =
-    goog.inherits;
-// note that the newline above is necessary to satisfy the linter
+ol.inherits = function(childCtor, parentCtor) {
+  childCtor.prototype = Object.create(parentCtor.prototype);
+  childCtor.prototype.constructor = childCtor;
+};
+
+
+/**
+ * A reusable function, used e.g. as a default for callbacks.
+ *
+ * @return {undefined} Nothing.
+ */
+ol.nullFunction = function() {};
+
+
+ol.global = Function('return this')();

@@ -1,14 +1,12 @@
 goog.provide('ol.Image');
 
-goog.require('goog.array');
 goog.require('goog.asserts');
-goog.require('goog.events');
-goog.require('goog.events.EventType');
-goog.require('goog.object');
 goog.require('ol.ImageBase');
 goog.require('ol.ImageState');
+goog.require('ol.events');
+goog.require('ol.events.EventType');
 goog.require('ol.extent');
-
+goog.require('ol.object');
 
 
 /**
@@ -25,7 +23,7 @@ goog.require('ol.extent');
 ol.Image = function(extent, resolution, pixelRatio, attributions, src,
     crossOrigin, imageLoadFunction) {
 
-  goog.base(this, extent, resolution, pixelRatio, ol.ImageState.IDLE,
+  ol.ImageBase.call(this, extent, resolution, pixelRatio, ol.ImageState.IDLE,
       attributions);
 
   /**
@@ -36,22 +34,22 @@ ol.Image = function(extent, resolution, pixelRatio, attributions, src,
 
   /**
    * @private
-   * @type {Image}
+   * @type {HTMLCanvasElement|Image|HTMLVideoElement}
    */
   this.image_ = new Image();
-  if (!goog.isNull(crossOrigin)) {
+  if (crossOrigin !== null) {
     this.image_.crossOrigin = crossOrigin;
   }
 
   /**
    * @private
-   * @type {Object.<number, Image>}
+   * @type {Object.<number, (HTMLCanvasElement|Image|HTMLVideoElement)>}
    */
   this.imageByContext_ = {};
 
   /**
    * @private
-   * @type {Array.<number>}
+   * @type {Array.<ol.events.Key>}
    */
   this.imageListenerKeys_ = null;
 
@@ -68,21 +66,22 @@ ol.Image = function(extent, resolution, pixelRatio, attributions, src,
   this.imageLoadFunction_ = imageLoadFunction;
 
 };
-goog.inherits(ol.Image, ol.ImageBase);
+ol.inherits(ol.Image, ol.ImageBase);
 
 
 /**
+ * Get the HTML image element (may be a Canvas, Image, or Video).
  * @param {Object=} opt_context Object.
  * @return {HTMLCanvasElement|Image|HTMLVideoElement} Image.
  * @api
  */
 ol.Image.prototype.getImage = function(opt_context) {
-  if (goog.isDef(opt_context)) {
+  if (opt_context !== undefined) {
     var image;
     var key = goog.getUid(opt_context);
     if (key in this.imageByContext_) {
       return this.imageByContext_[key];
-    } else if (goog.object.isEmpty(this.imageByContext_)) {
+    } else if (ol.object.isEmpty(this.imageByContext_)) {
       image = this.image_;
     } else {
       image = /** @type {Image} */ (this.image_.cloneNode(false));
@@ -113,7 +112,7 @@ ol.Image.prototype.handleImageError_ = function() {
  * @private
  */
 ol.Image.prototype.handleImageLoad_ = function() {
-  if (!goog.isDef(this.resolution)) {
+  if (this.resolution === undefined) {
     this.resolution = ol.extent.getHeight(this.extent) / this.image_.height;
   }
   this.state = ol.ImageState.LOADED;
@@ -123,20 +122,33 @@ ol.Image.prototype.handleImageLoad_ = function() {
 
 
 /**
- * Load not yet loaded URI.
+ * Load the image or retry if loading previously failed.
+ * Loading is taken care of by the tile queue, and calling this method is
+ * only needed for preloading or for reloading in case of an error.
+ * @api
  */
 ol.Image.prototype.load = function() {
-  if (this.state == ol.ImageState.IDLE) {
+  if (this.state == ol.ImageState.IDLE || this.state == ol.ImageState.ERROR) {
     this.state = ol.ImageState.LOADING;
-    goog.asserts.assert(goog.isNull(this.imageListenerKeys_));
+    this.changed();
+    goog.asserts.assert(!this.imageListenerKeys_,
+        'this.imageListenerKeys_ should be null');
     this.imageListenerKeys_ = [
-      goog.events.listenOnce(this.image_, goog.events.EventType.ERROR,
-          this.handleImageError_, false, this),
-      goog.events.listenOnce(this.image_, goog.events.EventType.LOAD,
-          this.handleImageLoad_, false, this)
+      ol.events.listenOnce(this.image_, ol.events.EventType.ERROR,
+          this.handleImageError_, this),
+      ol.events.listenOnce(this.image_, ol.events.EventType.LOAD,
+          this.handleImageLoad_, this)
     ];
     this.imageLoadFunction_(this, this.src_);
   }
+};
+
+
+/**
+ * @param {HTMLCanvasElement|Image|HTMLVideoElement} image Image.
+ */
+ol.Image.prototype.setImage = function(image) {
+  this.image_ = image;
 };
 
 
@@ -146,7 +158,8 @@ ol.Image.prototype.load = function() {
  * @private
  */
 ol.Image.prototype.unlistenImage_ = function() {
-  goog.asserts.assert(!goog.isNull(this.imageListenerKeys_));
-  goog.array.forEach(this.imageListenerKeys_, goog.events.unlistenByKey);
+  goog.asserts.assert(this.imageListenerKeys_,
+      'this.imageListenerKeys_ should not be null');
+  this.imageListenerKeys_.forEach(ol.events.unlistenByKey);
   this.imageListenerKeys_ = null;
 };

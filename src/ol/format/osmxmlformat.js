@@ -1,19 +1,19 @@
 // FIXME add typedef for stack state objects
 goog.provide('ol.format.OSMXML');
 
-goog.require('goog.array');
 goog.require('goog.asserts');
 goog.require('goog.dom.NodeType');
-goog.require('goog.object');
+goog.require('ol.array');
 goog.require('ol.Feature');
 goog.require('ol.format.Feature');
 goog.require('ol.format.XMLFeature');
+goog.require('ol.geom.GeometryLayout');
 goog.require('ol.geom.LineString');
 goog.require('ol.geom.Point');
 goog.require('ol.geom.Polygon');
+goog.require('ol.object');
 goog.require('ol.proj');
 goog.require('ol.xml');
-
 
 
 /**
@@ -26,14 +26,14 @@ goog.require('ol.xml');
  * @api stable
  */
 ol.format.OSMXML = function() {
-  goog.base(this);
+  ol.format.XMLFeature.call(this);
 
   /**
    * @inheritDoc
    */
   this.defaultDataProjection = ol.proj.get('EPSG:4326');
 };
-goog.inherits(ol.format.OSMXML, ol.format.XMLFeature);
+ol.inherits(ol.format.OSMXML, ol.format.XMLFeature);
 
 
 /**
@@ -58,21 +58,23 @@ ol.format.OSMXML.prototype.getExtensions = function() {
  * @private
  */
 ol.format.OSMXML.readNode_ = function(node, objectStack) {
-  goog.asserts.assert(node.nodeType == goog.dom.NodeType.ELEMENT);
-  goog.asserts.assert(node.localName == 'node');
+  goog.asserts.assert(node.nodeType == goog.dom.NodeType.ELEMENT,
+      'node.nodeType should be ELEMENT');
+  goog.asserts.assert(node.localName == 'node', 'localName should be node');
   var options = /** @type {olx.format.ReadOptions} */ (objectStack[0]);
   var state = /** @type {Object} */ (objectStack[objectStack.length - 1]);
   var id = node.getAttribute('id');
-  var coordinates = /** @type {Array.<number>} */ ([
+  /** @type {ol.Coordinate} */
+  var coordinates = [
     parseFloat(node.getAttribute('lon')),
     parseFloat(node.getAttribute('lat'))
-  ]);
+  ];
   state.nodes[id] = coordinates;
 
   var values = ol.xml.pushParseAndPop({
     tags: {}
   }, ol.format.OSMXML.NODE_PARSERS_, node, objectStack);
-  if (!goog.object.isEmpty(values.tags)) {
+  if (!ol.object.isEmpty(values.tags)) {
     var geometry = new ol.geom.Point(coordinates);
     ol.format.Feature.transformWithOptions(geometry, false, options);
     var feature = new ol.Feature(geometry);
@@ -89,8 +91,9 @@ ol.format.OSMXML.readNode_ = function(node, objectStack) {
  * @private
  */
 ol.format.OSMXML.readWay_ = function(node, objectStack) {
-  goog.asserts.assert(node.nodeType == goog.dom.NodeType.ELEMENT);
-  goog.asserts.assert(node.localName == 'way');
+  goog.asserts.assert(node.nodeType == goog.dom.NodeType.ELEMENT,
+      'node.nodeType should be ELEMENT');
+  goog.asserts.assert(node.localName == 'way', 'localName should be way');
   var options = /** @type {olx.format.ReadOptions} */ (objectStack[0]);
   var id = node.getAttribute('id');
   var values = ol.xml.pushParseAndPop({
@@ -98,10 +101,11 @@ ol.format.OSMXML.readWay_ = function(node, objectStack) {
     tags: {}
   }, ol.format.OSMXML.WAY_PARSERS_, node, objectStack);
   var state = /** @type {Object} */ (objectStack[objectStack.length - 1]);
-  var flatCoordinates = /** @type {Array.<number>} */ ([]);
+  /** @type {Array.<number>} */
+  var flatCoordinates = [];
   for (var i = 0, ii = values.ndrefs.length; i < ii; i++) {
     var point = state.nodes[values.ndrefs[i]];
-    goog.array.extend(flatCoordinates, point);
+    ol.array.extend(flatCoordinates, point);
   }
   var geometry;
   if (values.ndrefs[0] == values.ndrefs[values.ndrefs.length - 1]) {
@@ -125,11 +129,11 @@ ol.format.OSMXML.readWay_ = function(node, objectStack) {
  * @param {Node} node Node.
  * @param {Array.<*>} objectStack Object stack.
  * @private
- * @return {ol.Feature|undefined} Track.
  */
 ol.format.OSMXML.readNd_ = function(node, objectStack) {
-  goog.asserts.assert(node.nodeType == goog.dom.NodeType.ELEMENT);
-  goog.asserts.assert(node.localName == 'nd');
+  goog.asserts.assert(node.nodeType == goog.dom.NodeType.ELEMENT,
+      'node.nodeType should be ELEMENT');
+  goog.asserts.assert(node.localName == 'nd', 'localName should be nd');
   var values = /** @type {Object} */ (objectStack[objectStack.length - 1]);
   values.ndrefs.push(node.getAttribute('ref'));
 };
@@ -139,11 +143,11 @@ ol.format.OSMXML.readNd_ = function(node, objectStack) {
  * @param {Node} node Node.
  * @param {Array.<*>} objectStack Object stack.
  * @private
- * @return {ol.Feature|undefined} Track.
  */
 ol.format.OSMXML.readTag_ = function(node, objectStack) {
-  goog.asserts.assert(node.nodeType == goog.dom.NodeType.ELEMENT);
-  goog.asserts.assert(node.localName == 'tag');
+  goog.asserts.assert(node.nodeType == goog.dom.NodeType.ELEMENT,
+      'node.nodeType should be ELEMENT');
+  goog.asserts.assert(node.localName == 'tag', 'localName should be tag');
   var values = /** @type {Object} */ (objectStack[objectStack.length - 1]);
   values.tags[node.getAttribute('k')] = node.getAttribute('v');
 };
@@ -161,10 +165,10 @@ ol.format.OSMXML.NAMESPACE_URIS_ = [
 
 /**
  * @const
- * @type {Object.<string, Object.<string, ol.xml.Parser>>}
+ * @type {Object.<string, Object.<string, ol.XmlParser>>}
  * @private
  */
-ol.format.OSMXML.WAY_PARSERS_ = ol.xml.makeParsersNS(
+ol.format.OSMXML.WAY_PARSERS_ = ol.xml.makeStructureNS(
     ol.format.OSMXML.NAMESPACE_URIS_, {
       'nd': ol.format.OSMXML.readNd_,
       'tag': ol.format.OSMXML.readTag_
@@ -173,10 +177,10 @@ ol.format.OSMXML.WAY_PARSERS_ = ol.xml.makeParsersNS(
 
 /**
  * @const
- * @type {Object.<string, Object.<string, ol.xml.Parser>>}
+ * @type {Object.<string, Object.<string, ol.XmlParser>>}
  * @private
  */
-ol.format.OSMXML.PARSERS_ = ol.xml.makeParsersNS(
+ol.format.OSMXML.PARSERS_ = ol.xml.makeStructureNS(
     ol.format.OSMXML.NAMESPACE_URIS_, {
       'node': ol.format.OSMXML.readNode_,
       'way': ol.format.OSMXML.readWay_
@@ -185,10 +189,10 @@ ol.format.OSMXML.PARSERS_ = ol.xml.makeParsersNS(
 
 /**
  * @const
- * @type {Object.<string, Object.<string, ol.xml.Parser>>}
+ * @type {Object.<string, Object.<string, ol.XmlParser>>}
  * @private
  */
-ol.format.OSMXML.NODE_PARSERS_ = ol.xml.makeParsersNS(
+ol.format.OSMXML.NODE_PARSERS_ = ol.xml.makeStructureNS(
     ol.format.OSMXML.NAMESPACE_URIS_, {
       'tag': ol.format.OSMXML.readTag_
     });
@@ -198,7 +202,7 @@ ol.format.OSMXML.NODE_PARSERS_ = ol.xml.makeParsersNS(
  * Read all features from an OSM source.
  *
  * @function
- * @param {ArrayBuffer|Document|Node|Object|string} source Source.
+ * @param {Document|Node|Object|string} source Source.
  * @param {olx.format.ReadOptions=} opt_options Read options.
  * @return {Array.<ol.Feature>} Features.
  * @api stable
@@ -210,14 +214,15 @@ ol.format.OSMXML.prototype.readFeatures;
  * @inheritDoc
  */
 ol.format.OSMXML.prototype.readFeaturesFromNode = function(node, opt_options) {
-  goog.asserts.assert(node.nodeType == goog.dom.NodeType.ELEMENT);
+  goog.asserts.assert(node.nodeType == goog.dom.NodeType.ELEMENT,
+      'node.nodeType should be ELEMENT');
   var options = this.getReadOptions(node, opt_options);
   if (node.localName == 'osm') {
     var state = ol.xml.pushParseAndPop({
       nodes: {},
       features: []
     }, ol.format.OSMXML.PARSERS_, node, [options]);
-    if (goog.isDef(state.features)) {
+    if (state.features) {
       return state.features;
     }
   }
@@ -229,7 +234,7 @@ ol.format.OSMXML.prototype.readFeaturesFromNode = function(node, opt_options) {
  * Read the projection from an OSM source.
  *
  * @function
- * @param {ArrayBuffer|Document|Node|Object|string} source Source.
+ * @param {Document|Node|Object|string} source Source.
  * @return {ol.proj.Projection} Projection.
  * @api stable
  */

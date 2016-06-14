@@ -7,7 +7,7 @@ goog.require('ol.source.XYZ');
 
 
 var attribution = new ol.Attribution({
-  html: 'Tiles &copy; <a href="http://services.arcgisonline.com/ArcGIS/' +
+  html: 'Tiles © <a href="http://services.arcgisonline.com/ArcGIS/' +
       'rest/services/World_Topo_Map/MapServer">ArcGIS</a>'
 });
 
@@ -23,7 +23,7 @@ var map = new ol.Map({
     })
   ],
   view: new ol.View({
-    center: ol.proj.transform([-121.1, 47.5], 'EPSG:4326', 'EPSG:3857'),
+    center: ol.proj.fromLonLat([-121.1, 47.5]),
     zoom: 7
   })
 });

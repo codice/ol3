@@ -16,6 +16,18 @@ var closer = document.getElementById('popup-closer');
 
 
 /**
+ * Create an overlay to anchor the popup to the map.
+ */
+var overlay = new ol.Overlay(/** @type {olx.OverlayOptions} */ ({
+  element: container,
+  autoPan: true,
+  autoPanAnimation: {
+    duration: 250
+  }
+}));
+
+
+/**
  * Add a click handler to hide the popup.
  * @return {boolean} Don't follow the href.
  */
@@ -27,17 +39,6 @@ closer.onclick = function() {
 
 
 /**
- * Create an overlay to anchor the popup to the map.
- */
-var overlay = new ol.Overlay(/** @type {olx.OverlayOptions} */ ({
-  element: container,
-  autoPanAnimation: {
-    duration: 250
-  }
-}));
-
-
-/**
  * Create the map.
  */
 var map = new ol.Map({
@@ -45,12 +46,12 @@ var map = new ol.Map({
     new ol.layer.Tile({
       source: new ol.source.TileJSON({
         url: 'http://api.tiles.mapbox.com/v3/' +
-            'mapbox.natural-earth-hypso-bathy.jsonp',
+            'mapbox.natural-earth-hypso-bathy.json',
         crossOrigin: 'anonymous'
       })
     })
   ],
-  renderer: exampleNS.getRendererFromQueryString(),
+  renderer: common.getRendererFromQueryString(),
   overlays: [overlay],
   target: 'map',
   view: new ol.View({

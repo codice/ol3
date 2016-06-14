@@ -1,11 +1,11 @@
 goog.provide('ol.geom.Point');
 
 goog.require('ol.extent');
+goog.require('ol.geom.GeometryLayout');
 goog.require('ol.geom.GeometryType');
 goog.require('ol.geom.SimpleGeometry');
 goog.require('ol.geom.flat.deflate');
 goog.require('ol.math');
-
 
 
 /**
@@ -19,11 +19,10 @@ goog.require('ol.math');
  * @api stable
  */
 ol.geom.Point = function(coordinates, opt_layout) {
-  goog.base(this);
-  this.setCoordinates(coordinates,
-      /** @type {ol.geom.GeometryLayout|undefined} */ (opt_layout));
+  ol.geom.SimpleGeometry.call(this);
+  this.setCoordinates(coordinates, opt_layout);
 };
-goog.inherits(ol.geom.Point, ol.geom.SimpleGeometry);
+ol.inherits(ol.geom.Point, ol.geom.SimpleGeometry);
 
 
 /**
@@ -41,8 +40,7 @@ ol.geom.Point.prototype.clone = function() {
 /**
  * @inheritDoc
  */
-ol.geom.Point.prototype.closestPointXY =
-    function(x, y, closestPoint, minSquaredDistance) {
+ol.geom.Point.prototype.closestPointXY = function(x, y, closestPoint, minSquaredDistance) {
   var flatCoordinates = this.flatCoordinates;
   var squaredDistance = ol.math.squaredDistance(
       x, y, flatCoordinates[0], flatCoordinates[1]);
@@ -61,11 +59,12 @@ ol.geom.Point.prototype.closestPointXY =
 
 
 /**
+ * Return the coordinate of the point.
  * @return {ol.Coordinate} Coordinates.
  * @api stable
  */
 ol.geom.Point.prototype.getCoordinates = function() {
-  return goog.isNull(this.flatCoordinates) ? [] : this.flatCoordinates.slice();
+  return !this.flatCoordinates ? [] : this.flatCoordinates.slice();
 };
 
 
@@ -88,7 +87,7 @@ ol.geom.Point.prototype.getType = function() {
 
 /**
  * @inheritDoc
- * @api
+ * @api stable
  */
 ol.geom.Point.prototype.intersectsExtent = function(extent) {
   return ol.extent.containsXY(extent,
@@ -97,16 +96,17 @@ ol.geom.Point.prototype.intersectsExtent = function(extent) {
 
 
 /**
+ * Set the coordinate of the point.
  * @param {ol.Coordinate} coordinates Coordinates.
  * @param {ol.geom.GeometryLayout=} opt_layout Layout.
  * @api stable
  */
 ol.geom.Point.prototype.setCoordinates = function(coordinates, opt_layout) {
-  if (goog.isNull(coordinates)) {
+  if (!coordinates) {
     this.setFlatCoordinates(ol.geom.GeometryLayout.XY, null);
   } else {
     this.setLayout(opt_layout, coordinates, 0);
-    if (goog.isNull(this.flatCoordinates)) {
+    if (!this.flatCoordinates) {
       this.flatCoordinates = [];
     }
     this.flatCoordinates.length = ol.geom.flat.deflate.coordinate(

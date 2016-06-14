@@ -24,7 +24,7 @@ Although Closure library functions are widely used within OL3, none of them are 
 Unlike in, say, Node, where a module's exports are fixed in the source, with Closure Compiler, exports can be defined at compile time. This makes it easy to create builds that are customized to the needs of a particular site or application: a __custom build__ only exports those properties and methods needed by the site or application. As the full build is large, and will probably become larger as new features are added to the API, it's recommended that sites create a custom build for production software.
 
 ## Renderers and Browser Support
-The library currently includes three renderers: Canvas, DOM, and WebGL. All three support raster data from tile/image servers, but only the Canvas renderer currently supports vector data. This means that only those browsers that [support Canvas](http://caniuse.com/canvas) can handle vector data. In particular, this excludes Internet Explorer versions before 9, though there is some support for those in the DOM renderer. Clearly, the WebGL renderer can only be used on those devices and browsers supporting WebGL.
+The library currently includes three renderers: Canvas, DOM, and WebGL. All three support both raster data from tile/image servers, and vector data; WebGL however only supports Point vectors and does not support labels. Clearly only those browsers that [support Canvas](http://caniuse.com/canvas) can use the Canvas renderer. Equally, the WebGL renderer can only be used on those devices and [browsers](http://caniuse.com/webgl) that support WebGL. Internet Explorer versions before 9 are not supported at all.
 
 The library is intended for use on both desktop/laptop and mobile devices.
 
@@ -38,7 +38,5 @@ OL3 uses a similar object hierarchy to the Closure library. There is a top-level
 Class namespaces, such as `ol.layer` have a base class type with the same name, such as `ol.layer.Layer`. These are mainly abstract classes, from which the other subclasses inherit.
 
 Source files are similarly organised, with a directory for each class namespace. Names are however all lower-case, and the subclasses repeat the superclass type in their name, for example, `ol/layer/vectorlayer.js`.
-
-The naming structure means that there are sometimes 2 objects with the same name but different initial, such as `ol.feature`, a simple object with static functions to be used with features, and `ol.Feature`, a class used to instantiate new features. These two objects are however stored in the same file, in this case, `ol/feature.js`
 
 OL3 follows the convention that the names of private properties and methods, that is, those that are not part of the API, end in an underscore. In general, instance properties are private and accessed using accessors.

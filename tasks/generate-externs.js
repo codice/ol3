@@ -1,8 +1,5 @@
-var fs = require('fs');
-var path = require('path');
-
 var async = require('async');
-var fse = require('fs-extra');
+var fs = require('fs-extra');
 var nomnom = require('nomnom');
 
 var generateInfo = require('./generate-info');
@@ -161,7 +158,7 @@ function generateExterns(typedefs, symbols, externs, base) {
   // defined as types in the ol externs file. But the corresponding @typedef's
   // are not marked with an @api annotation because abstract base classes are
   // not instantiated by applications. Yet, we need to have a type defined
-  // in the ol externs file for these options types. So we just use
+  // in the ol externs file for these options types. So we just use
   // @typedef {Object}.
   Object.keys(constructorOptionsTypes).forEach(function(key) {
     lines.push('/**');
@@ -213,7 +210,7 @@ if (require.main === module) {
 
   async.waterfall([
     main,
-    fse.outputFile.bind(fse, options.output)
+    fs.outputFile.bind(fs, options.output)
   ], function(err) {
     if (err) {
       process.stderr.write(err.message + '\n');

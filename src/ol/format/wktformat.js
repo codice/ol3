@@ -1,7 +1,7 @@
 goog.provide('ol.format.WKT');
 
-goog.require('goog.array');
 goog.require('goog.asserts');
+goog.require('ol');
 goog.require('ol.Feature');
 goog.require('ol.format.Feature');
 goog.require('ol.format.TextFeature');
@@ -16,8 +16,11 @@ goog.require('ol.geom.Point');
 goog.require('ol.geom.Polygon');
 
 
-
 /**
+ * @classdesc
+ * Geometry format for reading and writing data in the `WellKnownText` (WKT)
+ * format.
+ *
  * @constructor
  * @extends {ol.format.TextFeature}
  * @param {olx.format.WKTOptions=} opt_options Options.
@@ -25,20 +28,20 @@ goog.require('ol.geom.Polygon');
  */
 ol.format.WKT = function(opt_options) {
 
-  var options = goog.isDef(opt_options) ? opt_options : {};
+  var options = opt_options ? opt_options : {};
 
-  goog.base(this);
+  ol.format.TextFeature.call(this);
 
   /**
    * Split GeometryCollection into multiple features.
    * @type {boolean}
    * @private
    */
-  this.splitCollection_ = goog.isDef(options.splitCollection) ?
+  this.splitCollection_ = options.splitCollection !== undefined ?
       options.splitCollection : false;
 
 };
-goog.inherits(ol.format.WKT, ol.format.TextFeature);
+ol.inherits(ol.format.WKT, ol.format.TextFeature);
 
 
 /**
@@ -55,7 +58,7 @@ ol.format.WKT.EMPTY = 'EMPTY';
  */
 ol.format.WKT.encodePointGeometry_ = function(geom) {
   var coordinates = geom.getCoordinates();
-  if (goog.array.isEmpty(coordinates)) {
+  if (coordinates.length === 0) {
     return '';
   }
   return coordinates[0] + ' ' + coordinates[1];
@@ -164,7 +167,7 @@ ol.format.WKT.encodeMultiPolygonGeometry_ = function(geom) {
 ol.format.WKT.encode_ = function(geom) {
   var type = geom.getType();
   var geometryEncoder = ol.format.WKT.GeometryEncoder_[type];
-  goog.asserts.assert(goog.isDef(geometryEncoder));
+  goog.asserts.assert(geometryEncoder, 'geometryEncoder should be defined');
   var enc = geometryEncoder(geom);
   type = type.toUpperCase();
   if (enc.length === 0) {
@@ -208,7 +211,7 @@ ol.format.WKT.prototype.parse_ = function(wkt) {
  * Read a feature from a WKT source.
  *
  * @function
- * @param {ArrayBuffer|Document|Node|Object|string} source Source.
+ * @param {Document|Node|Object|string} source Source.
  * @param {olx.format.ReadOptions=} opt_options Read options.
  * @return {ol.Feature} Feature.
  * @api stable
@@ -221,7 +224,7 @@ ol.format.WKT.prototype.readFeature;
  */
 ol.format.WKT.prototype.readFeatureFromText = function(text, opt_options) {
   var geom = this.readGeometryFromText(text, opt_options);
-  if (goog.isDef(geom)) {
+  if (geom) {
     var feature = new ol.Feature();
     feature.setGeometry(geom);
     return feature;
@@ -234,7 +237,7 @@ ol.format.WKT.prototype.readFeatureFromText = function(text, opt_options) {
  * Read all features from a WKT source.
  *
  * @function
- * @param {ArrayBuffer|Document|Node|Object|string} source Source.
+ * @param {Document|Node|Object|string} source Source.
  * @param {olx.format.ReadOptions=} opt_options Read options.
  * @return {Array.<ol.Feature>} Features.
  * @api stable
@@ -269,7 +272,7 @@ ol.format.WKT.prototype.readFeaturesFromText = function(text, opt_options) {
  * Read a single geometry from a WKT source.
  *
  * @function
- * @param {ArrayBuffer|Document|Node|Object|string} source Source.
+ * @param {Document|Node|Object|string} source Source.
  * @param {olx.format.ReadOptions=} opt_options Read options.
  * @return {ol.geom.Geometry} Geometry.
  * @api stable
@@ -282,7 +285,7 @@ ol.format.WKT.prototype.readGeometry;
  */
 ol.format.WKT.prototype.readGeometryFromText = function(text, opt_options) {
   var geometry = this.parse_(text);
-  if (goog.isDef(geometry)) {
+  if (geometry) {
     return /** @type {ol.geom.Geometry} */ (
         ol.format.Feature.transformWithOptions(geometry, false, opt_options));
   } else {
@@ -308,7 +311,7 @@ ol.format.WKT.prototype.writeFeature;
  */
 ol.format.WKT.prototype.writeFeatureText = function(feature, opt_options) {
   var geometry = feature.getGeometry();
-  if (goog.isDef(geometry)) {
+  if (geometry) {
     return this.writeGeometryText(geometry, opt_options);
   }
   return '';
@@ -364,12 +367,6 @@ ol.format.WKT.prototype.writeGeometryText = function(geometry, opt_options) {
 
 
 /**
- * @typedef {{type: number, value: (number|string|undefined), position: number}}
- */
-ol.format.WKT.Token;
-
-
-/**
  * @const
  * @enum {number}
  */
@@ -381,7 +378,6 @@ ol.format.WKT.TokenType = {
   COMMA: 5,
   EOF: 6
 };
-
 
 
 /**
@@ -423,7 +419,7 @@ ol.format.WKT.Lexer.prototype.isAlpha_ = function(c) {
  * @private
  */
 ol.format.WKT.Lexer.prototype.isNumeric_ = function(c, opt_decimal) {
-  var decimal = goog.isDef(opt_decimal) ? opt_decimal : false;
+  var decimal = opt_decimal !== undefined ? opt_decimal : false;
   return c >= '0' && c <= '9' || c == '.' && !decimal;
 };
 
@@ -449,7 +445,7 @@ ol.format.WKT.Lexer.prototype.nextChar_ = function() {
 
 /**
  * Fetch and return the next token.
- * @return {!ol.format.WKT.Token} Next string token.
+ * @return {!ol.WKTToken} Next string token.
  */
 ol.format.WKT.Lexer.prototype.nextToken = function() {
   var c = this.nextChar_();
@@ -486,12 +482,23 @@ ol.format.WKT.Lexer.prototype.nextToken = function() {
 ol.format.WKT.Lexer.prototype.readNumber_ = function() {
   var c, index = this.index_;
   var decimal = false;
+  var scientificNotation = false;
   do {
     if (c == '.') {
       decimal = true;
+    } else if (c == 'e' || c == 'E') {
+      scientificNotation = true;
     }
     c = this.nextChar_();
-  } while (this.isNumeric_(c, decimal));
+  } while (
+      this.isNumeric_(c, decimal) ||
+      // if we haven't detected a scientific number before, 'e' or 'E'
+      // hint that we should continue to read
+      !scientificNotation && (c == 'e' || c == 'E') ||
+      // once we know that we have a scientific number, both '-' and '+'
+      // are allowed
+      scientificNotation && (c == '-' || c == '+')
+  );
   return parseFloat(this.wkt.substring(index, this.index_--));
 };
 
@@ -509,10 +516,9 @@ ol.format.WKT.Lexer.prototype.readText_ = function() {
 };
 
 
-
 /**
  * Class to parse the tokens from the WKT string.
- * @param {ol.format.WKT.Lexer} lexer
+ * @param {ol.format.WKT.Lexer} lexer The lexer.
  * @constructor
  * @protected
  */
@@ -525,7 +531,7 @@ ol.format.WKT.Parser = function(lexer) {
   this.lexer_ = lexer;
 
   /**
-   * @type {ol.format.WKT.Token}
+   * @type {ol.WKTToken}
    * @private
    */
   this.token_;
@@ -549,7 +555,7 @@ ol.format.WKT.Parser.prototype.consume_ = function() {
 
 /**
  * If the given type matches the current token, consume it.
- * @param {ol.format.WKT.TokenType.<number>} type Token type.
+ * @param {ol.format.WKT.TokenType} type Token type.
  * @return {boolean} Whether the token matches the given type.
  */
 ol.format.WKT.Parser.prototype.match = function(type) {
@@ -568,7 +574,8 @@ ol.format.WKT.Parser.prototype.match = function(type) {
 ol.format.WKT.Parser.prototype.parse = function() {
   this.consume_();
   var geometry = this.parseGeometry_();
-  goog.asserts.assert(this.token_.type == ol.format.WKT.TokenType.EOF);
+  goog.asserts.assert(this.token_.type == ol.format.WKT.TokenType.EOF,
+      'token type should be end of file');
   return geometry;
 };
 
@@ -587,7 +594,7 @@ ol.format.WKT.Parser.prototype.parseGeometry_ = function() {
     } else {
       var parser = ol.format.WKT.Parser.GeometryParser_[geomType];
       var ctor = ol.format.WKT.Parser.GeometryConstructor_[geomType];
-      if (!goog.isDef(parser) || !goog.isDef(ctor)) {
+      if (!parser || !ctor) {
         throw new Error('Invalid geometry type: ' + geomType);
       }
       var coordinates = parser.call(this);
@@ -825,7 +832,7 @@ ol.format.WKT.Parser.prototype.formatErrorMessage_ = function() {
 
 
 /**
- * @enum {function (new:ol.geom.Geometry, Array, ol.geom.GeometryLayout.<string>=)}
+ * @enum {function (new:ol.geom.Geometry, Array, ol.geom.GeometryLayout)}
  * @private
  */
 ol.format.WKT.Parser.GeometryConstructor_ = {

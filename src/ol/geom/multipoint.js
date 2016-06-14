@@ -1,15 +1,15 @@
 goog.provide('ol.geom.MultiPoint');
 
-goog.require('goog.array');
 goog.require('goog.asserts');
+goog.require('ol.array');
 goog.require('ol.extent');
+goog.require('ol.geom.GeometryLayout');
 goog.require('ol.geom.GeometryType');
 goog.require('ol.geom.Point');
 goog.require('ol.geom.SimpleGeometry');
 goog.require('ol.geom.flat.deflate');
 goog.require('ol.geom.flat.inflate');
 goog.require('ol.math');
-
 
 
 /**
@@ -23,23 +23,24 @@ goog.require('ol.math');
  * @api stable
  */
 ol.geom.MultiPoint = function(coordinates, opt_layout) {
-  goog.base(this);
-  this.setCoordinates(coordinates,
-      /** @type {ol.geom.GeometryLayout|undefined} */ (opt_layout));
+  ol.geom.SimpleGeometry.call(this);
+  this.setCoordinates(coordinates, opt_layout);
 };
-goog.inherits(ol.geom.MultiPoint, ol.geom.SimpleGeometry);
+ol.inherits(ol.geom.MultiPoint, ol.geom.SimpleGeometry);
 
 
 /**
+ * Append the passed point to this multipoint.
  * @param {ol.geom.Point} point Point.
  * @api stable
  */
 ol.geom.MultiPoint.prototype.appendPoint = function(point) {
-  goog.asserts.assert(point.getLayout() == this.layout);
-  if (goog.isNull(this.flatCoordinates)) {
+  goog.asserts.assert(point.getLayout() == this.layout,
+      'the layout of point should match layout');
+  if (!this.flatCoordinates) {
     this.flatCoordinates = point.getFlatCoordinates().slice();
   } else {
-    goog.array.extend(this.flatCoordinates, point.getFlatCoordinates());
+    ol.array.extend(this.flatCoordinates, point.getFlatCoordinates());
   }
   this.changed();
 };
@@ -60,8 +61,7 @@ ol.geom.MultiPoint.prototype.clone = function() {
 /**
  * @inheritDoc
  */
-ol.geom.MultiPoint.prototype.closestPointXY =
-    function(x, y, closestPoint, minSquaredDistance) {
+ol.geom.MultiPoint.prototype.closestPointXY = function(x, y, closestPoint, minSquaredDistance) {
   if (minSquaredDistance <
       ol.extent.closestSquaredDistanceXY(this.getExtent(), x, y)) {
     return minSquaredDistance;
@@ -85,6 +85,7 @@ ol.geom.MultiPoint.prototype.closestPointXY =
 
 
 /**
+ * Return the coordinates of the multipoint.
  * @return {Array.<ol.Coordinate>} Coordinates.
  * @api stable
  */
@@ -95,14 +96,16 @@ ol.geom.MultiPoint.prototype.getCoordinates = function() {
 
 
 /**
+ * Return the point at the specified index.
  * @param {number} index Index.
  * @return {ol.geom.Point} Point.
  * @api stable
  */
 ol.geom.MultiPoint.prototype.getPoint = function(index) {
-  var n = goog.isNull(this.flatCoordinates) ?
+  var n = !this.flatCoordinates ?
       0 : this.flatCoordinates.length / this.stride;
-  goog.asserts.assert(0 <= index && index < n);
+  goog.asserts.assert(0 <= index && index < n,
+      'index should be in between 0 and n');
   if (index < 0 || n <= index) {
     return null;
   }
@@ -114,6 +117,7 @@ ol.geom.MultiPoint.prototype.getPoint = function(index) {
 
 
 /**
+ * Return the points of this multipoint.
  * @return {Array.<ol.geom.Point>} Points.
  * @api stable
  */
@@ -144,7 +148,7 @@ ol.geom.MultiPoint.prototype.getType = function() {
 
 /**
  * @inheritDoc
- * @api
+ * @api stable
  */
 ol.geom.MultiPoint.prototype.intersectsExtent = function(extent) {
   var flatCoordinates = this.flatCoordinates;
@@ -162,17 +166,17 @@ ol.geom.MultiPoint.prototype.intersectsExtent = function(extent) {
 
 
 /**
+ * Set the coordinates of the multipoint.
  * @param {Array.<ol.Coordinate>} coordinates Coordinates.
  * @param {ol.geom.GeometryLayout=} opt_layout Layout.
  * @api stable
  */
-ol.geom.MultiPoint.prototype.setCoordinates =
-    function(coordinates, opt_layout) {
-  if (goog.isNull(coordinates)) {
+ol.geom.MultiPoint.prototype.setCoordinates = function(coordinates, opt_layout) {
+  if (!coordinates) {
     this.setFlatCoordinates(ol.geom.GeometryLayout.XY, null);
   } else {
     this.setLayout(opt_layout, coordinates, 1);
-    if (goog.isNull(this.flatCoordinates)) {
+    if (!this.flatCoordinates) {
       this.flatCoordinates = [];
     }
     this.flatCoordinates.length = ol.geom.flat.deflate.coordinates(
@@ -186,8 +190,7 @@ ol.geom.MultiPoint.prototype.setCoordinates =
  * @param {ol.geom.GeometryLayout} layout Layout.
  * @param {Array.<number>} flatCoordinates Flat coordinates.
  */
-ol.geom.MultiPoint.prototype.setFlatCoordinates =
-    function(layout, flatCoordinates) {
+ol.geom.MultiPoint.prototype.setFlatCoordinates = function(layout, flatCoordinates) {
   this.setFlatCoordinatesInternal(layout, flatCoordinates);
   this.changed();
 };

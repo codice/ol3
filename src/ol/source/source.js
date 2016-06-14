@@ -1,16 +1,15 @@
 goog.provide('ol.source.Source');
 goog.provide('ol.source.State');
 
-goog.require('goog.events.EventType');
+goog.require('ol');
 goog.require('ol.Attribution');
-goog.require('ol.Observable');
+goog.require('ol.Object');
 goog.require('ol.proj');
 
 
 /**
  * State of the source, one of 'undefined', 'loading', 'ready' or 'error'.
  * @enum {string}
- * @api
  */
 ol.source.State = {
   UNDEFINED: 'undefined',
@@ -21,30 +20,21 @@ ol.source.State = {
 
 
 /**
- * @typedef {{attributions: (Array.<ol.Attribution>|undefined),
- *            logo: (string|olx.LogoOptions|undefined),
- *            projection: ol.proj.ProjectionLike,
- *            state: (ol.source.State|undefined)}}
- */
-ol.source.SourceOptions;
-
-
-
-/**
  * @classdesc
  * Abstract base class; normally only used for creating subclasses and not
  * instantiated in apps.
  * Base class for {@link ol.layer.Layer} sources.
  *
+ * A generic `change` event is triggered when the state of the source changes.
+ *
  * @constructor
- * @extends {ol.Observable}
- * @fires change Triggered when the state of the source changes.
- * @param {ol.source.SourceOptions} options Source options.
+ * @extends {ol.Object}
+ * @param {ol.SourceSourceOptions} options Source options.
  * @api stable
  */
 ol.source.Source = function(options) {
 
-  goog.base(this);
+  ol.Object.call(this);
 
   /**
    * @private
@@ -56,8 +46,7 @@ ol.source.Source = function(options) {
    * @private
    * @type {Array.<ol.Attribution>}
    */
-  this.attributions_ = goog.isDef(options.attributions) ?
-      options.attributions : null;
+  this.attributions_ = ol.source.Source.toAttributionsArray_(options.attributions);
 
   /**
    * @private
@@ -69,11 +58,48 @@ ol.source.Source = function(options) {
    * @private
    * @type {ol.source.State}
    */
-  this.state_ = goog.isDef(options.state) ?
+  this.state_ = options.state !== undefined ?
       options.state : ol.source.State.READY;
 
+  /**
+   * @private
+   * @type {boolean}
+   */
+  this.wrapX_ = options.wrapX !== undefined ? options.wrapX : false;
+
 };
-goog.inherits(ol.source.Source, ol.Observable);
+ol.inherits(ol.source.Source, ol.Object);
+
+/**
+ * Turns various ways of defining an attribution to an array of `ol.Attributions`.
+ *
+ * @param {ol.AttributionLike|undefined}
+ *     attributionLike The attributions as string, array of strings,
+ *     `ol.Attribution`, array of `ol.Attribution` or undefined.
+ * @return {Array.<ol.Attribution>} The array of `ol.Attribution` or null if
+ *     `undefined` was given.
+ */
+ol.source.Source.toAttributionsArray_ = function(attributionLike) {
+  if (typeof attributionLike === 'string') {
+    return [new ol.Attribution({html: attributionLike})];
+  } else if (attributionLike instanceof ol.Attribution) {
+    return [attributionLike];
+  } else if (Array.isArray(attributionLike)) {
+    var len = attributionLike.length;
+    var attributions = new Array(len);
+    for (var i = 0; i < len; i++) {
+      var item = attributionLike[i];
+      if (typeof item === 'string') {
+        attributions[i] = new ol.Attribution({html: item});
+      } else {
+        attributions[i] = item;
+      }
+    }
+    return attributions;
+  } else {
+    return null;
+  }
+};
 
 
 /**
@@ -81,15 +107,16 @@ goog.inherits(ol.source.Source, ol.Observable);
  * @param {number} resolution Resolution.
  * @param {number} rotation Rotation.
  * @param {Object.<string, boolean>} skippedFeatureUids Skipped feature uids.
- * @param {function(ol.Feature): T} callback Feature callback.
+ * @param {function((ol.Feature|ol.render.Feature)): T} callback Feature
+ *     callback.
  * @return {T|undefined} Callback result.
  * @template T
  */
-ol.source.Source.prototype.forEachFeatureAtCoordinate =
-    goog.nullFunction;
+ol.source.Source.prototype.forEachFeatureAtCoordinate = ol.nullFunction;
 
 
 /**
+ * Get the attributions of the source.
  * @return {Array.<ol.Attribution>} Attributions.
  * @api stable
  */
@@ -99,6 +126,7 @@ ol.source.Source.prototype.getAttributions = function() {
 
 
 /**
+ * Get the logo of the source.
  * @return {string|olx.LogoOptions|undefined} Logo.
  * @api stable
  */
@@ -108,6 +136,7 @@ ol.source.Source.prototype.getLogo = function() {
 
 
 /**
+ * Get the projection of the source.
  * @return {ol.proj.Projection} Projection.
  * @api
  */
@@ -123,6 +152,7 @@ ol.source.Source.prototype.getResolutions = goog.abstractMethod;
 
 
 /**
+ * Get the state of the source, see {@link ol.source.State} for possible states.
  * @return {ol.source.State} State.
  * @api
  */
@@ -132,14 +162,37 @@ ol.source.Source.prototype.getState = function() {
 
 
 /**
- * @param {Array.<ol.Attribution>} attributions Attributions.
+ * @return {boolean|undefined} Wrap X.
  */
-ol.source.Source.prototype.setAttributions = function(attributions) {
-  this.attributions_ = attributions;
+ol.source.Source.prototype.getWrapX = function() {
+  return this.wrapX_;
 };
 
 
 /**
+ * Refreshes the source and finally dispatches a 'change' event.
+ * @api
+ */
+ol.source.Source.prototype.refresh = function() {
+  this.changed();
+};
+
+
+/**
+ * Set the attributions of the source.
+ * @param {ol.AttributionLike|undefined} attributions Attributions.
+ *     Can be passed as `string`, `Array<string>`, `{@link ol.Attribution}`,
+ *     `Array<{@link ol.Attribution}>` or `undefined`.
+ * @api
+ */
+ol.source.Source.prototype.setAttributions = function(attributions) {
+  this.attributions_ = ol.source.Source.toAttributionsArray_(attributions);
+  this.changed();
+};
+
+
+/**
+ * Set the logo of the source.
  * @param {string|olx.LogoOptions|undefined} logo Logo.
  */
 ol.source.Source.prototype.setLogo = function(logo) {
@@ -148,18 +201,11 @@ ol.source.Source.prototype.setLogo = function(logo) {
 
 
 /**
+ * Set the state of the source.
  * @param {ol.source.State} state State.
  * @protected
  */
 ol.source.Source.prototype.setState = function(state) {
   this.state_ = state;
   this.changed();
-};
-
-
-/**
- * @param {ol.proj.Projection} projection Projetion.
- */
-ol.source.Source.prototype.setProjection = function(projection) {
-  this.projection_ = projection;
 };
